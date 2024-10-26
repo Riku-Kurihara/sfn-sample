@@ -5,16 +5,18 @@ import uuid
 import boto3
 
 
-def hello_handler(body):
+def start_step_handler(body, type):
     sfn = boto3.client("stepfunctions")
 
     state_machine_arn = os.environ["STATE_MACHINE_ARN"]
     execution_id = str(uuid.uuid4())
 
+    body = {"type": type, "data": body}
+
     try:
         response = sfn.start_execution(
             stateMachineArn=state_machine_arn,
-            name=execution_id,  # 実行名として execution_id を使用
+            name=execution_id,
             input=json.dumps(body),
         )
 
@@ -62,7 +64,7 @@ def check_status_handler(body):
 
 
 handler_map = {
-    "/api/hello": hello_handler,
+    "/api/hello": start_step_handler,
     "/api/check-step": check_status_handler,
 }
 
@@ -73,4 +75,8 @@ def handler(event, context):
     body = json.loads(event["body"])
     path = event["path"]
     handler = handler_map[path]
-    return handler(body)
+    if path != "/api/check-step":
+        type = "helloWorld" if path == "/api/hello" else "goodMorning"
+        return handler(body, type)
+    else:
+        return handler(body)

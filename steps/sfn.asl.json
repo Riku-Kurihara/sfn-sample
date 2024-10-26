@@ -1,7 +1,22 @@
 {
   "Comment": "Evidence Label Processing Workflow",
-  "StartAt": "ProcessEvidenceLabel",
+  "StartAt": "CheckInput",
   "States": {
+    "CheckInput": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.type",
+          "StringEquals": "helloWorld",
+          "Next": "ProcessHelloWorld"
+        },
+        {
+          "Variable": "$.type",
+          "StringEquals": "goodMorning",
+          "Next": "ProcessGoodMorning"
+        }
+      ]
+    },
     "ProcessHelloWorld": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
@@ -9,15 +24,24 @@
         "FunctionName": "${HelloWorldFunctionArn}",
         "Payload.$": "$"
       },
-      "TimeoutSeconds": 60,
-      "Retry": [
+      "TimeoutSeconds": 300,
+      "Catch": [
         {
-          "ErrorEquals": ["States.TaskFailed"],
-          "IntervalSeconds": 5,
-          "MaxAttempts": 5,
-          "BackoffRate": 2.0
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleError"
         }
       ],
+      "End": true
+    },
+    "ProcessGoodMorning": {
+      "Type": "Task",
+
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${GoodMorningFunctionArn}",
+        "Payload.$": "$"
+      },
+      "TimeoutSeconds": 300,
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],

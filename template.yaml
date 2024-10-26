@@ -40,6 +40,27 @@ Resources:
         - Key: HelloWorld
           Value: Green
 
+  GoodMorningFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Timeout: 60
+      Architectures:
+        - x86_64
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./good_morning
+      DockerTag: python3.12-v1
+
+  GoodMorningLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${GoodMorningFunction}
+      RetentionInDays: 1
+      Tags:
+        - Key: GoodMorning
+          Value: Green
+
   HelloWorldStepFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -63,6 +84,12 @@ Resources:
             RestApiId: !Ref MyApi
             Path: /api/hello
             Method: post
+        GoodMorning:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /api/good-morning
+            Method: post
         CheckStep:
           Type: Api
           Properties:
@@ -83,9 +110,12 @@ Resources:
       DefinitionUri: ./steps/sfn.asl.json
       DefinitionSubstitutions:
         HelloWorldFunctionArn: !GetAtt HelloWorldFunction.Arn
+        GoodMorningFunctionArn: !GetAtt GoodMorningFunction.Arn
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref HelloWorldFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GoodMorningFunction
 
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
@@ -107,3 +137,9 @@ Outputs:
   HelloWorldFunctionIamRole:
     Description: Implicit IAM Role created for Hello World function
     Value: !GetAtt HelloWorldFunctionRole.Arn
+  GoodMorningFunction:
+    Description: Good Morning Lambda Function ARN
+    Value: !GetAtt GoodMorningFunction.Arn
+  GoodMorningFunctionIamRole:
+    Description: Implicit IAM Role created for Good Morning function
+    Value: !GetAtt GoodMorningFunctionRole.Arn
