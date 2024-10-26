@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  python3.12
+
+  Sample SAM Template for step-fn-sample
+
+Globals:
+  Function:
+    Timeout: 29
+Resources:
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: step-fn-sample
+      Description: step functionsのサンプル
+      StageName: v1
+      MethodSettings:
+        - DataTraceEnabled: true
+          ResourcePath: "/*"
+          HttpMethod: "*"
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Timeout: 60
+      Architectures:
+        - x86_64
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./hello_world
+      DockerTag: python3.12-v1
+
+  HelloWorldLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${HelloWorldFunction}
+      RetentionInDays: 1
+      Tags:
+        - Key: HelloWorld
+          Value: Green
+
+  HelloWorldStepFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Policies:
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt HelloWorldStateMachine.Name
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - states:DescribeExecution
+                - states:ListExecutions
+                - states:GetExecutionHistory
+              Resource:
+                - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:*:*
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /api/hello
+            Method: post
+        CheckStep:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /api/check-step
+            Method: post
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !GetAtt HelloWorldStateMachine.Arn
+    Metadata:
+      Dockerfile: ./steps/Dockerfile
+      DockerContext: ./
+      DockerTag: python3.12-v1
+
+  HelloWorldStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: ./steps/sfn.asl.json
+      DefinitionSubstitutions:
+        HelloWorldFunctionArn: !GetAtt HelloWorldFunction.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref HelloWorldFunction
+
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name:
+        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName:
+        Ref: ApplicationResourceGroup
+      AutoConfigurationEnabled: "true"
+Outputs:
+  HelloWorldFunction:
+    Description: Hello World Lambda Function ARN
+    Value: !GetAtt HelloWorldFunction.Arn
+  HelloWorldFunctionIamRole:
+    Description: Implicit IAM Role created for Hello World function
+    Value: !GetAtt HelloWorldFunctionRole.Arn
